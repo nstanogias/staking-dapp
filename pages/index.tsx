@@ -1,13 +1,192 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import type { NextPage } from 'next';
-import Head from 'next/head';
-import styles from '../styles/Home.module.css';
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import type { NextPage } from "next";
+import Head from "next/head";
+import { useContractRead, useContractWrite } from "wagmi";
+import {
+  nftContractAddress,
+  nftContractAbi,
+  meldTokenAddress,
+  meldTokenAbi,
+  delegatorContractAddress,
+  delegatorContractAbi,
+  storageContractAbi,
+  storageContractAddress,
+} from "../contracts";
+import { useState, useEffect } from "react";
+import useActiveWagmi from "../hooks/useActiveWagmi";
+import { writeContract, readContract } from "@wagmi/core";
+import { formatUnits } from "viem";
+import { TActivePool, TStakingPosition } from "../types";
 
 const Home: NextPage = () => {
+  const { account, isConnected } = useActiveWagmi();
+  const [activePools, setActivePools] = useState<(TActivePool | undefined)[]>(
+    []
+  );
+  const [positions, setPositions] = useState<(TStakingPosition | undefined)[]>(
+    []
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>("");
+
+  const { data: allowance } = useContractRead({
+    address: meldTokenAddress,
+    abi: meldTokenAbi,
+    functionName: "allowance",
+    args: [account ?? `0x${""}`, nftContractAddress],
+  });
+  const [isDefinitelyConnected, setIsDefinitelyConnected] = useState(false);
+
+  const { data, write } = useContractWrite({
+    address: delegatorContractAddress,
+    abi: delegatorContractAbi,
+    functionName: "stake",
+    onError(error) {
+      setError(error.message);
+    },
+    onSuccess(data, variables, context) {
+      alert("Success");
+    },
+  });
+
+  const stakeHandler = async (
+    numTokens: string | null,
+    nodeId: `0x${string}`
+  ) => {
+    if (!numTokens || isNaN(+numTokens) || +numTokens < 0) {
+      return;
+    }
+    try {
+      if (allowance && Number(BigInt(allowance)) < +numTokens) {
+        const result = await writeContract({
+          abi: meldTokenAbi,
+          address: meldTokenAddress,
+          functionName: "approve",
+          args: [nftContractAddress, BigInt(1000)],
+        });
+        if (result.hash) {
+          write?.({
+            args: [BigInt(+numTokens), nodeId, BigInt(3)],
+          });
+        }
+      } else {
+        write?.({
+          args: [BigInt(+numTokens), nodeId, BigInt(3)],
+        });
+      }
+    } catch (error) {
+      setError(error);
+      console.error(error);
+    }
+  };
+
+  const fetchPools = async () => {
+    setLoading(true);
+    try {
+      const numNodes = await readContract({
+        abi: storageContractAbi,
+        address: storageContractAddress,
+        functionName: "getNumNodes",
+      });
+
+      const activeStakingPools = await Promise.all(
+        Array.from({ length: Number(numNodes) }).map(async (_, i) => {
+          const nodeId = await readContract({
+            abi: storageContractAbi,
+            address: storageContractAddress,
+            functionName: "nodeIds",
+            args: [BigInt(i)],
+          });
+          const isNodeActive = await readContract({
+            abi: storageContractAbi,
+            address: storageContractAddress,
+            functionName: "isNodeActive",
+            args: [nodeId],
+          });
+          if (isNodeActive) {
+            const nodeName = await readContract({
+              abi: storageContractAbi,
+              address: storageContractAddress,
+              functionName: "getNodeName",
+              args: [nodeId],
+            });
+            // const baseStakedAmount = await readContract({
+            //   abi: storageContractAbi,
+            //   address: storageContractAddress,
+            //   functionName: "getNodeBaseStakedAmount",
+            //   args: [nodeId],
+            // });
+            // const maxStakingAmount = await readContract({
+            //   abi: storageContractAbi,
+            //   address: storageContractAddress,
+            //   functionName: "getNodeMaxStakingAmount",
+            //   args: [nodeId],
+            // });
+            return {
+              nodeName,
+              nodeId,
+              // da: formatUnits(maxStakingAmount, 9),
+              // das: formatUnits(baseStakedAmount, 9),
+              // diff: formatUnits(
+              //   BigInt(Number(maxStakingAmount) - Number(baseStakedAmount)),
+              //   9
+              // ),
+            };
+          }
+        })
+      );
+      setActivePools(activeStakingPools);
+    } catch (error) {
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserPositions = async () => {
+    setLoading(true);
+    try {
+      const tokens = await readContract({
+        abi: nftContractAbi,
+        address: nftContractAddress,
+        functionName: "getAllTokensByOwner",
+        args: [account ?? `0x${""}`],
+      });
+
+      const userPositions = await Promise.all(
+        tokens.map(async (token, i) => {
+          const metadata = await readContract({
+            abi: nftContractAbi,
+            address: nftContractAddress,
+            functionName: "tokenURI",
+            args: [BigInt(token)],
+          });
+          const decoded = JSON.parse(atob(metadata.split(",")[1]));
+          return decoded;
+        })
+      );
+      setPositions(userPositions);
+    } catch (error) {
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // I am doing this as a fix for: https://github.com/wevm/wagmi/issues/542
+  useEffect(() => {
+    if (isConnected) {
+      setIsDefinitelyConnected(true);
+      fetchPools();
+      fetchUserPositions();
+    } else {
+      setIsDefinitelyConnected(false);
+    }
+  }, [account, isConnected]);
+
   return (
-    <div className={styles.container}>
+    <div className="bg-[#19191D] text-white">
       <Head>
-        <title>RainbowKit App</title>
+        <title>MeldStaking</title>
         <meta
           content="Generated by @rainbow-me/create-rainbowkit"
           name="description"
@@ -15,66 +194,87 @@ const Home: NextPage = () => {
         <link href="/favicon.ico" rel="icon" />
       </Head>
 
-      <main className={styles.main}>
-        <ConnectButton />
-
-        <h1 className={styles.title}>
-          Welcome to <a href="">RainbowKit</a> + <a href="">wagmi</a> +{' '}
-          <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.tsx</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a className={styles.card} href="https://rainbowkit.com">
-            <h2>RainbowKit Documentation &rarr;</h2>
-            <p>Learn how to customize your wallet connection flow.</p>
-          </a>
-
-          <a className={styles.card} href="https://wagmi.sh">
-            <h2>wagmi Documentation &rarr;</h2>
-            <p>Learn how to interact with Ethereum.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://github.com/rainbow-me/rainbowkit/tree/main/examples"
-          >
-            <h2>RainbowKit Examples &rarr;</h2>
-            <p>Discover boilerplate example RainbowKit projects.</p>
-          </a>
-
-          <a className={styles.card} href="https://nextjs.org/docs">
-            <h2>Next.js Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-          >
-            <h2>Next.js Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            className={styles.card}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+      <div className="flex flex-1 flex-col min-h-screen">
+        <div className="flex justify-end ">
+          <ConnectButton />
         </div>
-      </main>
 
-      <footer className={styles.footer}>
-        <a href="https://rainbow.me" rel="noopener noreferrer" target="_blank">
-          Made with ❤️ by your frens at 🌈
+        {isDefinitelyConnected &&
+          (loading ? (
+            <div className="text-2xl font-bold text-center">Loading...</div>
+          ) : (
+            <div className="flex flex-col">
+              <div className="p-8 mt-32 mx-32 bg-[#444657] rounded rounded-lg">
+                <h2 className="font-bold text-2xl">Active Staking Pools</h2>
+                <ul className="mt-4">
+                  {activePools.map((pool) => (
+                    <li key={pool?.nodeId} className="mt-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex">
+                          <span>Name:</span>
+                          <span className="ml-2 font-bold">
+                            {pool?.nodeName}
+                          </span>
+                        </div>
+                        <div className="flex ml-4">
+                          <span>NodeId:</span>
+                          <span className="ml-2">{pool?.nodeId}</span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            stakeHandler(
+                              prompt(
+                                "How many tokens do you want to stake?",
+                                ""
+                              ),
+                              (pool?.nodeId as `0x${string}`) ?? `0x${""}`
+                            )
+                          }
+                          className="flex px-6  py-2 bg-[#FC1C4A] rounded-md rounded"
+                        >
+                          Stake
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="p-8 mt-6 mx-32 bg-[#444657] rounded rounded-lg mt-2">
+                <h2 className="font-bold text-2xl">Your Staking Positions</h2>
+                <ul className="mt-4">
+                  {positions.map((position) => (
+                    <li key={position?.name} className="mt-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex">
+                          <span>Name:</span>
+                          <span className="ml-2 font-bold">
+                            {position?.name}
+                          </span>
+                        </div>
+                        <div className="flex ml-4">
+                          <span>Description:</span>
+                          <span className="ml-2">{position?.description}</span>
+                        </div>
+                        <img
+                          src={position?.image}
+                          className="h-12 w-12 rounded-md"
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      <footer className="flex justify-center">
+        <a
+          href="https://nstanogias.com"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Made with ❤️
         </a>
       </footer>
     </div>

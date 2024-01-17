@@ -1,35 +1,41 @@
-import '../styles/globals.css';
-import '@rainbow-me/rainbowkit/styles.css';
-import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import type { AppProps } from 'next/app';
-import { configureChains, createConfig, WagmiConfig } from 'wagmi';
+import "../styles/globals.css";
+import "@rainbow-me/rainbowkit/styles.css";
 import {
-  arbitrum,
-  goerli,
-  mainnet,
-  optimism,
-  polygon,
-  base,
-  zora,
-} from 'wagmi/chains';
-import { publicProvider } from 'wagmi/providers/public';
+  Chain,
+  getDefaultWallets,
+  RainbowKitProvider,
+} from "@rainbow-me/rainbowkit";
+import type { AppProps } from "next/app";
+import { configureChains, createConfig, WagmiConfig } from "wagmi";
+import { publicProvider } from "wagmi/providers/public";
 
+const meld: Chain = {
+  id: 222000222,
+  name: "MELD Kanazawa",
+  network: "MELD Kanazawa",
+  iconBackground: "#fff",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Meld",
+    symbol: "gMELD",
+  },
+  rpcUrls: {
+    public: { http: ["https://testnet-rpc.meld.com"] },
+    default: { http: ["https://testnet-rpc.meld.com"] },
+  },
+  blockExplorers: {
+    default: { name: "Meld", url: "https://testnet.meldscan.io" },
+  },
+  testnet: true,
+};
 const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [
-    mainnet,
-    polygon,
-    optimism,
-    arbitrum,
-    base,
-    zora,
-    ...(process.env.NEXT_PUBLIC_ENABLE_TESTNETS === 'true' ? [goerli] : []),
-  ],
+  [meld],
   [publicProvider()]
 );
 
 const { connectors } = getDefaultWallets({
-  appName: 'RainbowKit App',
-  projectId: 'YOUR_PROJECT_ID',
+  appName: "Meld Staking Dapp",
+  projectId: process.env.NEXT_PUBLIC_PROJECT_ID ?? "",
   chains,
 });
 
