@@ -48,6 +48,7 @@ const Home: NextPage = () => {
     },
     onSuccess(data, variables, context) {
       alert("Success");
+      fetchUserPositions();
     },
   });
 
