@@ -17,6 +17,8 @@ import useActiveWagmi from "../hooks/useActiveWagmi";
 import { writeContract, readContract } from "@wagmi/core";
 import { formatUnits } from "viem";
 import { TActivePool, TStakingPosition } from "../types";
+import { StakingPositions } from "../components/StakingPositions";
+import AvailablePools from "../components/AvailablePools";
 
 const Home: NextPage = () => {
   const { account, isConnected } = useActiveWagmi();
@@ -28,6 +30,7 @@ const Home: NextPage = () => {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>("");
+  const [isDefinitelyConnected, setIsDefinitelyConnected] = useState(false);
 
   const { data: allowance } = useContractRead({
     address: meldTokenAddress,
@@ -35,7 +38,6 @@ const Home: NextPage = () => {
     functionName: "allowance",
     args: [account ?? `0x${""}`, nftContractAddress],
   });
-  const [isDefinitelyConnected, setIsDefinitelyConnected] = useState(false);
 
   const { data, write } = useContractWrite({
     address: delegatorContractAddress,
@@ -204,66 +206,8 @@ const Home: NextPage = () => {
             <div className="text-2xl font-bold text-center">Loading...</div>
           ) : (
             <div className="flex flex-col">
-              <div className="p-8 mt-32 mx-32 bg-[#444657] rounded rounded-lg">
-                <h2 className="font-bold text-2xl">Active Staking Pools</h2>
-                <ul className="mt-4">
-                  {activePools.map((pool) => (
-                    <li key={pool?.nodeId} className="mt-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex">
-                          <span>Name:</span>
-                          <span className="ml-2 font-bold">
-                            {pool?.nodeName}
-                          </span>
-                        </div>
-                        <div className="flex ml-4">
-                          <span>NodeId:</span>
-                          <span className="ml-2">{pool?.nodeId}</span>
-                        </div>
-                        <button
-                          onClick={() =>
-                            stakeHandler(
-                              prompt(
-                                "How many tokens do you want to stake?",
-                                ""
-                              ),
-                              (pool?.nodeId as `0x${string}`) ?? `0x${""}`
-                            )
-                          }
-                          className="flex px-6  py-2 bg-[#FC1C4A] rounded-md rounded"
-                        >
-                          Stake
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-8 mt-6 mx-32 bg-[#444657] rounded rounded-lg mt-2">
-                <h2 className="font-bold text-2xl">Your Staking Positions</h2>
-                <ul className="mt-4">
-                  {positions.map((position) => (
-                    <li key={position?.name} className="mt-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex">
-                          <span>Name:</span>
-                          <span className="ml-2 font-bold">
-                            {position?.name}
-                          </span>
-                        </div>
-                        <div className="flex ml-4">
-                          <span>Description:</span>
-                          <span className="ml-2">{position?.description}</span>
-                        </div>
-                        <img
-                          src={position?.image}
-                          className="h-12 w-12 rounded-md"
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <AvailablePools activePools={activePools} stake={stakeHandler} />
+              <StakingPositions positions={positions} />
             </div>
           ))}
       </div>
