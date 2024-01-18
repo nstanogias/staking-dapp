@@ -15,7 +15,7 @@ import {
 import { useState, useEffect } from "react";
 import useActiveWagmi from "../hooks/useActiveWagmi";
 import { writeContract, readContract } from "@wagmi/core";
-import { formatUnits } from "viem";
+import { formatUnits, parseEther } from "viem";
 import { TActivePool, TStakingPosition } from "../types";
 import { StakingPositions } from "../components/StakingPositions";
 import AvailablePools from "../components/AvailablePools";
@@ -31,13 +31,6 @@ const Home: NextPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>("");
   const [isDefinitelyConnected, setIsDefinitelyConnected] = useState(false);
-
-  const { data: allowance } = useContractRead({
-    address: meldTokenAddress,
-    abi: meldTokenAbi,
-    functionName: "allowance",
-    args: [account ?? `0x${""}`, nftContractAddress],
-  });
 
   const { data, write } = useContractWrite({
     address: delegatorContractAddress,
@@ -61,21 +54,29 @@ const Home: NextPage = () => {
       return;
     }
     try {
+      const allowance = await readContract({
+        address: meldTokenAddress,
+        abi: meldTokenAbi,
+        functionName: "allowance",
+        args: [account ?? `0x${""}`, nftContractAddress],
+      });
       if (allowance !== undefined && Number(BigInt(allowance)) < +numTokens) {
         const result = await writeContract({
           abi: meldTokenAbi,
           address: meldTokenAddress,
           functionName: "approve",
-          args: [nftContractAddress, BigInt(numTokens)],
+          args: [nftContractAddress, parseEther(numTokens)],
         });
         if (result.hash) {
-          write?.({
-            args: [BigInt(+numTokens), nodeId, BigInt(3)],
-          });
+          setTimeout(() => {
+            write?.({
+              args: [parseEther(numTokens), nodeId, BigInt(3)],
+            });
+          }, 1000);
         }
       } else {
         write?.({
-          args: [BigInt(+numTokens), nodeId, BigInt(3)],
+          args: [parseEther(numTokens), nodeId, BigInt(3)],
         });
       }
     } catch (error) {
