@@ -48,6 +48,7 @@ const Home: NextPage = () => {
     },
     onSuccess(data, variables, context) {
       alert("Success");
+      setError("");
       fetchUserPositions();
     },
   });
@@ -60,12 +61,12 @@ const Home: NextPage = () => {
       return;
     }
     try {
-      if (allowance && Number(BigInt(allowance)) < +numTokens) {
+      if (allowance !== undefined && Number(BigInt(allowance)) < +numTokens) {
         const result = await writeContract({
           abi: meldTokenAbi,
           address: meldTokenAddress,
           functionName: "approve",
-          args: [nftContractAddress, BigInt(1000)],
+          args: [nftContractAddress, BigInt(numTokens)],
         });
         if (result.hash) {
           write?.({
@@ -201,7 +202,7 @@ const Home: NextPage = () => {
         <div className="flex justify-end ">
           <ConnectButton />
         </div>
-
+        {error && <div className="text-[red]">{error}</div>}
         {isDefinitelyConnected &&
           (loading ? (
             <div className="text-2xl font-bold text-center">Loading...</div>
