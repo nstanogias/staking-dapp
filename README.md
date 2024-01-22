@@ -10,7 +10,21 @@ The following functionalities are in place:
 
 ## Run the project
 
-First, run the development server:
+1. The contracts are deployed in the MELD testnet network (Kanazawa), which you will have to add to your list of available networks.
+
+```bash
+Network name : MELD Kanazawa
+RPC URL : testnet-rpc.meld.com
+Chain ID : 222000222
+Symbol : gMELD
+Block explorer : https://testnet.meldscan.io
+```
+
+2. After that, you would need to obtain testnet tokens, which can be minted in https://faucet.meld.com
+
+3. Import MELD TOKEN for testnet to your wallet: 0x22200025a5bc2c7da9c8ed6c051a58e12efa7501
+
+4. Run the development server:
 
 ```bash
 npm run dev
